@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 interface Vendor {
@@ -12,16 +13,32 @@ interface Vendor {
 }
 
 export default function VendorsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState(searchParams.get('search') || '');
+  const [selectedTag, setSelectedTag] = useState(searchParams.get('tag') || '');
+  const [allTags, setAllTags] = useState<string[]>([]);
 
   useEffect(() => {
     const fetchVendors = async () => {
       try {
-        const response = await fetch('/api/vendors');
+        const params = new URLSearchParams();
+        if (searchTerm) params.set('search', searchTerm);
+        if (selectedTag) params.set('tag', selectedTag);
+
+        const response = await fetch(`/api/vendors?${params.toString()}`);
         if (!response.ok) throw new Error('取引先データの取得に失敗しました');
         const data = await response.json();
         setVendors(data);
+
+        // タグの一覧を収集
+        const tags = new Set<string>();
+        data.forEach((vendor: Vendor) => {
+          vendor.tags.forEach(tag => tags.add(tag));
+        });
+        setAllTags(Array.from(tags).sort());
       } catch (error) {
         console.error('Error:', error);
       } finally {
@@ -30,7 +47,29 @@ export default function VendorsPage() {
     };
 
     fetchVendors();
-  }, []);
+  }, [searchTerm, selectedTag]);
+
+  const handleSearch = (value: string) => {
+    setSearchTerm(value);
+    const params = new URLSearchParams(searchParams);
+    if (value) {
+      params.set('search', value);
+    } else {
+      params.delete('search');
+    }
+    router.push(`/dashboard/vendors?${params.toString()}`);
+  };
+
+  const handleTagFilter = (tag: string) => {
+    setSelectedTag(tag);
+    const params = new URLSearchParams(searchParams);
+    if (tag) {
+      params.set('tag', tag);
+    } else {
+      params.delete('tag');
+    }
+    router.push(`/dashboard/vendors?${params.toString()}`);
+  };
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -46,6 +85,56 @@ export default function VendorsPage() {
               >
                 新規登録
               </Link>
+            </div>
+
+            <div className="mb-6 space-y-4">
+              <div>
+                <label htmlFor="search" className="block text-sm font-medium text-gray-700">
+                  検索
+                </label>
+                <input
+                  type="text"
+                  id="search"
+                  value={searchTerm}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  placeholder="取引先名またはメールアドレスで検索"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  data-testid="vendor-search-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  タグでフィルター
+                </label>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => handleTagFilter('')}
+                    className={`px-3 py-1 rounded-full text-sm ${
+                      selectedTag === ''
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                    }`}
+                    data-testid="tag-filter-all"
+                  >
+                    すべて
+                  </button>
+                  {allTags.map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => handleTagFilter(tag)}
+                      className={`px-3 py-1 rounded-full text-sm ${
+                        selectedTag === tag
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                      }`}
+                      data-testid={`tag-filter-${tag}`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {isLoading ? (

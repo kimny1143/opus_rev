@@ -4,12 +4,12 @@
 export {};
 declare global {
   namespace Cypress {
-    interface Chainable<Subject = any> {
+    interface Chainable {
       /**
        * カスタムコマンド: ログイン
        * @example cy.login('test@example.com', 'password123')
        */
-      login(email: string, password: string): Chainable<void>;
+      login(email?: string, password?: string): Chainable<void>;
 
       /**
        * カスタムコマンド: ログアウト
@@ -21,13 +21,14 @@ declare global {
 }
 
 // ログインコマンド
-Cypress.Commands.add('login', (email: string, password: string) => {
-  cy.visit('/login');
-  cy.get('[name="email"]').type(email);
-  cy.get('[name="password"]').type(password);
-  cy.get('button[type="submit"]').click();
-  // ログイン後のリダイレクトを待機
-  cy.url().should('include', '/dashboard');
+Cypress.Commands.add('login', (email = 'test@example.com', password = 'password123') => {
+  cy.session([email, password], () => {
+    cy.visit('/login');
+    cy.get('[data-testid="email-input"]').type(email);
+    cy.get('[data-testid="password-input"]').type(password);
+    cy.get('[data-testid="login-button"]').click();
+    cy.url().should('include', '/dashboard');
+  });
 });
 
 // ログアウトコマンド
